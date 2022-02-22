@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "mscsk-project"
+version = "0.1.0"
+description = ""
+authors = ["Bishal Timilsina <bishaltimilsina@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+numpy = "^1.22.2"
+airsim = "^1.6.0"
+torch = "^1.10.2"
+Pillow = "^9.0.1"
+tensorboard = "^2.8.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
