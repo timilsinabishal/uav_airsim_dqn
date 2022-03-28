@@ -3,6 +3,9 @@ saved models
 last_episode.txt
 log.txt
 .idea
-__pycache__"""
+__pycache__
+*.pyc
 videos
 tests.txt
+
+.DS_Store

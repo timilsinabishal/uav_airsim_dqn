@@ -14,6 +14,8 @@ import numpy as np
 import airsim
 #import setup_path
 
+from detector import HSVDetector
+
 MOVEMENT_INTERVAL = 1
 
 class DroneEnv(object):
@@ -21,9 +23,11 @@ class DroneEnv(object):
 
     def __init__(self, useDepth=False):
         self.client = airsim.MultirotorClient()
-        self.last_dist = self.get_distance(self.client.getMultirotorState().kinematics_estimated.position)
-        self.quad_offset = (0, 0, 0)
         self.useDepth = useDepth
+        self.detector = HSVDetector()
+        state, image = self.get_obs()
+        self.last_dist = self.get_distance(self.client.getMultirotorState().kinematics_estimated.position, image)
+        self.quad_offset = (0, 0, 0)
 
     def step(self, action):
         """Step"""
@@ -48,14 +52,15 @@ class DroneEnv(object):
         if quad_state.z_val < - 7.3:
             self.client.moveToPositionAsync(quad_state.x_val, quad_state.y_val, -7, 1).join()
 
-        result, done = self.compute_reward(quad_state, quad_vel, collision)
         state, image = self.get_obs()
+        result, done = self.compute_reward(quad_state, quad_vel, collision, image)
 
         return state, result, done, image
 
     def reset(self):
         self.client.reset()
-        self.last_dist = self.get_distance(self.client.getMultirotorState().kinematics_estimated.position)
+        state, image = self.get_obs()
+        self.last_dist = self.get_distance(self.client.getMultirotorState().kinematics_estimated.position, image)
         self.client.enableApiControl(True)
         self.client.armDisarm(True)
         self.client.takeoffAsync().join()
@@ -70,7 +75,7 @@ class DroneEnv(object):
         if self.useDepth:
             # get depth image
             responses = self.client.simGetImages(
-                [airsim.ImageRequest(0, airsim.ImageType.DepthPlanner, pixels_as_float=True)])
+                [airsim.ImageRequest(0, airsim.ImageType.DepthPlanar, pixels_as_float=True)])
             response = responses[0]
             img1d = np.array(response.image_data_float, dtype=np.float)
             img1d = img1d * 3.5 + 30
@@ -91,28 +96,31 @@ class DroneEnv(object):
 
         return obs, image
 
-    def get_distance(self, quad_state):
+    def get_distance(self, quad_state, frame):
         """Get distance between current state and goal state"""
+        x, y, frame = self.detector.process(frame)
         pts = np.array([3, -76, -7])
         quad_pt = np.array(list((quad_state.x_val, quad_state.y_val, quad_state.z_val)))
         dist = np.linalg.norm(quad_pt - pts)
         return dist
 
-    def compute_reward(self, quad_state, quad_vel, collision):
+    def compute_reward(self, quad_state, quad_vel, collision, image):
         """Compute reward"""
 
-        reward = -1
+        reward = 0
 
         if collision:
             reward = -50
         else:
-            dist = self.get_distance(quad_state)
+            dist = self.get_distance(quad_state, image)
             diff = self.last_dist - dist
 
             if dist < 10:
-                reward = 500
+                reward = -20
+            if dist > 30:
+                reward = -20
             else:
-                reward += diff
+                reward = 500
 
 
             self.last_dist = dist
